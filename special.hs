@@ -7,6 +7,7 @@ module Main where
 import Control.Monad
 import Control.Monad.Error
 import Data.Array
+import Data.List
 import Data.Maybe (fromMaybe, fromJust)
 import Numeric
 import System.Environment
@@ -282,6 +283,8 @@ primitives = [ ("cons",           cons)
              , ("null?",          typePredicate isNull)
              , ("vector?",        typePredicate isVector)
              , ("symbol->string", symbolOp String)
+             , ("make-string",    makeString)
+             , ("string",         concatStrings)
              , ("explode",        symbolOp stringToChars)
              , ("string->symbol", stringToSymbol) ]
 
@@ -405,6 +408,23 @@ stringToSymbol :: LispFunction
 stringToSymbol [String s] = return $ Atom s
 stringToSymbol xs         = wrongOne "string" xs
 
+makeString :: LispFunction
+makeString [Integer n, Char c] 
+  | 0 <= n    = return . String $ genericTake n $ repeat c
+  | otherwise = typeMismatchError "positive number" $ Integer n
+makeString bad@[_, _] = typeMismatchError "integer and char" $ List bad
+makeString bad        = numArgsError 2 bad
+
+concatStrings :: LispFunction
+concatStrings ss = liftM (String . concat) $ mapM unpackStr ss
+
+charsToString :: LispFunction
+charsToString cs = liftM String $ mapM unpackChar cs
+
+unpackChar :: LispVal -> ThrowsError Char
+unpackChar (Char c) = return c
+unpackChar bad      = typeMismatchError "char" bad
+
 unpackNum :: LispVal -> ThrowsError Integer 
 unpackNum (Integer n) = return n
 unpackNum (String n)  = let parsed = reads n in
@@ -420,6 +440,7 @@ unpackStr (Integer s) = return $ show s
 unpackStr (Real s)    = return $ show s
 unpackStr b@(Bool _)  = return $ show b
 unpackStr (Atom s)    = return s 
+unpackStr (Char c)    = return [c]
 unpackStr bad         = typeMismatchError "string" bad
 
 unpackBool :: LispVal -> ThrowsError Bool
